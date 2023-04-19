@@ -1,2 +1,66 @@
-String str  = "abc"
-System.out.println(str);
+package com.codeonce.controller;
+
+
+import com.codeonce.pojo.Books;
+import com.codeonce.Service.BookService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.List;
+
+
+@Controller
+@RequestMapping("/book1")
+public class BookController1 {
+
+    // controller 调用 service层
+
+    @Autowired
+    @Qualifier("BookServiceImpl")
+    private BookService bookService;
+
+    // 查询全部的书籍,并且返回到一书籍展示的页面
+    @RequestMapping("/allBook1")
+//    @ResponseBody
+    public String queryAll(Model model) {
+        List<Books> booksList = bookService.queryAllBook();
+        model.addAttribute("booksList", booksList);
+        return "allBook1";
+    }
+//    // 查询书籍
+    @RequestMapping("/queryBook1")
+    public String queryBook(String bookName, Model model) {
+        // bookName = "%" + bookName + "%";
+        List<Books> booksList = bookService.queryBookName(bookName);
+        System.err.println("queryBook" + booksList);
+        model.addAttribute("booksList", booksList);
+        return "allBook1";
+    }
+
+    @RequestMapping("/tosubBook/{bookID}")
+    public String tosubBook(@PathVariable("bookID") int id,Model model) {
+        Books books = bookService.queryBookById(id);
+        model.addAttribute("books", books);
+        return "subBook";
+    }
+    // 借阅书籍请求
+    @RequestMapping("/subBook")
+    public String subBook(Books books) {
+        System.out.println("updateBook=>" + books);
+        int result = bookService.subBook(books);
+        return "redirect:/book1/allBook1";
+    }
+    @RequestMapping("/tolookbook/{bookID}")
+    public String tolookbook(@PathVariable("bookID") int id, Model model) {
+
+        Books books = bookService.queryBookById(id);
+        model.addAttribute("books", books);
+        return "lookbook";
+    }
+
+}
