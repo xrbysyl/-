@@ -1,0 +1,402 @@
+
+package planewar;
+
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.TimerTask;
+
+
+public class Draw extends JPanel {
+
+    //游戏状态--静态常量
+    public static final int START = 0;
+    public static final int RUNNING = 1;
+    public static final int PAUSE = 2;
+    public static final int GAME_OVER = 3;
+
+    //当前状态
+    int start = START;
+
+    HeroPlane hero= new HeroPlane();
+   // LittlePlane littlePlane = new LittlePlane();//new小飞机
+   // BigPlane bigPlane = new BigPlane();//new大飞机
+   // Bee bee = new Bee();//new小蜜蜂
+   // Bullet bullet = new Bullet(hero.getX(), hero.getY());//new子弹
+
+    //创建所有飞行物的数组
+    ArrayList<Fly> flyings = new ArrayList();
+    //创建子弹的数组
+    ArrayList<Bullet> bullets = new ArrayList();
+
+
+    //定时器--成员变量
+    java.util.Timer timer =new java.util.Timer();
+
+    //成员方法（）--游戏开始就执行的方法
+    //定时且重复的事情
+    public void action(){
+        //
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                //飞行物的运动
+                //littlePlane.move();
+               // bigPlane.move();
+               // bee.move();
+               // bullet.move();
+
+                if(start==RUNNING){
+                    hero.move();
+
+                    //生成很多飞行物
+                    createArrayFly();
+                    //生成很多子弹
+                    createbullet();
+                    //所有飞行物的move
+                    flymove();
+                    //子弹的move
+                    bulletmove();
+
+                    //判断所有飞行物是否越界
+                    outOfBoundAction();
+                    //判断子弹是否越界
+                    outOfBullet();
+
+                    //子弹打中
+                    fight();
+                    //飞行物与英雄机碰撞
+                    crash();
+                }
+
+
+
+
+
+                repaint();
+            }
+        },100,20);
+
+        //添加监听器--适配器
+        MouseAdapter adapter = new MouseAdapter(){
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                super.mouseClicked(e);
+                if(start==START){
+                    start=RUNNING;
+                    flyings = new ArrayList<Fly>();
+                    bullets = new ArrayList<Bullet>();
+                    hero.blood=3;
+                }
+                if(start==GAME_OVER){
+                    start=START;
+                }
+
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                super.mouseEntered(e);
+                if(start==PAUSE){
+                    start=RUNNING;
+                }
+
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                super.mouseExited(e);
+                if(start==RUNNING){
+                    start=PAUSE;
+                }
+            }
+
+            @Override//移动
+            public void mouseMoved(MouseEvent e) {
+                super.mouseMoved(e);
+
+                //英雄机移动
+                if(start==RUNNING){
+                    hero.setX(e.getX()-hero.getImageWidth()/2);
+                    hero.setY(e.getY()-hero.getImageHeight()/2);
+                    repaint();
+                }
+
+            }
+        };
+        this.addMouseListener(adapter);
+        this.addMouseMotionListener(adapter);
+    }
+
+    //飞行物与英雄机的碰撞
+    private void crash(){
+        for (int i = 0; i < flyings.size(); i++) {
+            Fly fly = flyings.get(i);
+
+            if(hero.getX()< (fly.getX()+fly.getImageWidth()) && hero.getX()+hero.getImageWidth()> fly.getX() &&
+                                    hero.getY()+hero.getImageHeight() > fly.getY() && hero.getY()< (fly.getY()+fly.getImageHeight())&&fly.blood>0){
+
+                fly.blood -= 1;
+                hero.blood -= 1;
+                if(hero.blood<=0){
+                    start=GAME_OVER;
+                }
+
+
+            }
+        }
+
+    }
+
+    //子弹击中飞行物
+    private void fight() {
+        for (int i = 0; i < flyings.size(); i++) {
+            Fly fly = flyings.get(i);
+            for (int j = 0; j < bullets.size(); j++) {
+
+                Bullet bullet = bullets.get(j);
+
+                if(bullet.getX()< (fly.getX()+fly.getImageWidth()) && bullet.getX()+bullet.getImageWidth()> fly.getX() &&
+                        bullet.getY()+bullet.getImageHeight() > fly.getY() && bullet.getY()< (fly.getY()+fly.getImageHeight())&&fly.blood>0 ){
+
+                    fly.blood -= 1;
+                    bullet.blood -= 1;
+                    //如果血量为零就消失
+                    if(bullet.blood==0){
+
+                        bullets.remove(bullet);
+                    }
+
+                    //加分
+                    if(fly.getBlood()==0){
+                        if(fly instanceof Enemy){
+                            Enemy enemy =(Enemy)fly;
+                            hero.setScore(hero.getScore()+enemy.getScore());
+                        }
+                        //小蜜蜂有几率加血
+                        if(fly instanceof Award) { //蜜蜂加血
+                            Award add = (Bee) fly;
+                            int n = (int) (Math.random() * 10);
+                            if(n%3==0){
+
+                                hero.setBlood(hero.getBlood()+add.addblood());
+                            }
+                        }
+                        //打败大飞机双倍火力
+                        if(fly instanceof BigPlane){
+                            BigPlane bigPlane =(BigPlane) fly;
+                            if(bigPlane.getBlood()==0){
+                                int n = (int) (Math.random()*10);
+                                if(n%3==0){
+                                    hero.doubleFire();
+                                }
+
+                            }
+                        }
+                    }
+
+                }
+
+            }
+        }
+    }
+
+    //判断子弹是否越界
+    private void outOfBullet() {
+        for (int i = 0; i < bullets.size(); i++) {
+            Bullet bullet = bullets.get(i);
+            if(bullet.getY()< 0){
+                bullets.remove(bullet);
+            }
+
+        }
+    }
+
+    //判断所有飞行物是否越界
+    private void outOfBoundAction() {
+        for (int i = 0; i < flyings.size(); i++) {
+            Fly fly = flyings.get(i);
+            if(fly.getY() > 600){
+                flyings.remove(fly);
+                hero.setScore(hero.getScore()-2);
+            }
+
+
+        }
+    }
+
+    //子弹运动
+    private void bulletmove() {
+        for (int i = 0; i < bullets.size(); i++) {
+            Bullet bullet = bullets.get(i);
+            bullet.move();
+        }
+    }
+
+
+    //所有飞行物的move
+    private void flymove() {
+        for (int i = 0; i < flyings.size(); i++) {
+            Fly fly = flyings.get(i);
+            fly.move();
+            if(fly.remove){
+                flyings.remove(fly);
+            }
+        }
+    }
+
+    //生成子弹
+    int i=0;
+    private void createbullet() {
+
+        i++;
+        Bullet bullet;
+        if(i%10==0){
+            Bullet [] bs = hero.shoot();
+            for(int i = 0 ; i < bs.length ; i++){
+                bullets.add(bs[i]);
+            }
+        }
+
+
+        /*
+
+               bullet = new Bullet(hero.getX(), hero.getY());
+            bullets.add(bullet);
+         */
+    }
+
+    //生成飞行物
+    int flyingIndex=0;
+    private void createArrayFly() {
+
+        flyingIndex++;
+
+        //判断定时器进入的时候
+        if(flyingIndex%10 == 0){
+            int ran = (int) (Math.random()*100);
+            //创建父类对象
+            Fly fly;
+            if(ran<=10){
+                fly = new Bee();
+            }else if(ran>10&&ran<=30){
+                fly = new BigPlane();
+            }else{
+                fly = new LittlePlane();
+
+            }
+            //将fly添加到flyings中
+            flyings.add(fly);
+        }
+
+    }
+
+    @Override
+    public void paint(Graphics g) {
+        //调用父类的画画方法
+        super.paint(g);
+
+        //画背景
+        BufferedImage bg = null;
+        //加载图片
+        //Draw01.class获取类的字节码对象
+        try {
+          bg= ImageIO.read(Draw.class.getResourceAsStream("image/background.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        //画图片
+        g.drawImage(bg,0,0,null);
+
+        //英雄机
+        g.drawImage(hero.getImage(),hero.getX(),hero.getY(),null);
+
+
+        //状态切换
+        if(start==START){
+            g.drawImage(ImageFiler.start,0,0,null);
+        }else if(start==RUNNING){
+
+
+            //g.drawImage(ImageFiler.heroplane1,heroPlane1.getX(),heroPlane1.getY(),null);
+            //画所有飞行物
+            paintflyings(g);
+
+            //小飞机
+            // LittlePlane littlePlane = new LittlePlane();
+            //g.drawImage(littlePlane.getImage(),littlePlane.getX(),littlePlane.getY(),null);
+            //g.drawImage(ImageFiler.littleplane,littlePlane.getX(),littlePlane.getY(),null);
+
+
+            //大飞机
+            //BigPlane bigPlane = new BigPlane();
+            //g.drawImage(bigPlane.getImage(),bigPlane.getX(),bigPlane.getY(),null);
+
+
+            //小蜜蜂
+            //Bee bee = new Bee();
+            // g.drawImage(bee.getImage(),bee.getX(),bee.getY(),null);
+
+            //子弹
+            //Bullet bullet = new Bullet(200, 400);
+            //g.drawImage(bullet.getImage(),bullet.getX(),bullet.getY(),null);
+
+
+            //画子弹
+            paintBullet(g);
+
+
+            if(hero.blood==0){
+                start=GAME_OVER;
+            }
+
+        }else if(start==PAUSE){
+            paintflyings(g);
+            paintBullet(g);
+            g.drawImage(ImageFiler.pause,0,0,null);
+
+        }else if(start==GAME_OVER){
+                g.drawImage(ImageFiler.gameover,0,0,null);
+
+
+        }
+        //设置字体大小
+        Font font = new Font("微软雅黑",Font.BOLD,20);
+        g.setFont(font);
+        //设置颜色
+        Color color = new Color(0,0,0);
+        g.setColor(color);
+        g.drawString("Score:"+hero.score,0,30);
+        g.drawString("Life:"+hero.blood,0,50);
+    }
+
+
+
+    //画子弹
+    private void paintBullet(Graphics g) {
+        for (int i = 0; i < bullets.size(); i++) {
+            Bullet bullet = bullets.get(i);
+            g.drawImage(bullet.getImage(),bullet.getX(),bullet.getY(),null);
+        }
+    }
+
+
+    //画所有飞行物
+    private void paintflyings(Graphics g) {
+
+        for (int i = 0; i < flyings.size(); i++) {
+            Fly fly = flyings.get(i);
+            g.drawImage(fly.getImage(),fly.getX(),fly.getY(),null);
+        }
+    }
+
+
+
+}
+
+
